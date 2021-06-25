@@ -47,4 +47,68 @@ def design_model(training_data):
     model.add(layers.MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
     model.add(layers.Dropout(0.2))
     
+    # experimenting with extra layesr
+    #model.add(tf.keras.layers.Conv2D(3, 3, strides=1, activation="relu"))
+    #model.add(tf.keras.layers.Conv2D(1, 1, strides=1, activation="relu"))
+    #model.add(tf.keras.layers.Dropout(0.1))
     
+    model.add(layers.Flatten())
+    # output layer with softmax activation function
+    model.add(layers.Dense(3,activation="softmax"))
+    # compile model with Adam optimizer
+    # loss function is categorical crossentropy
+    # metrics are categorical accuracy and AUC
+    print("\nCompiling model...")
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=.001), loss=tf.keras.losses.CategoricalCrossentropy(), metrics=[tf.keras.metrics.CategoricalAccuracy(),tf.keras.metrics.AUC()],)
+    # summarize model
+    model.summary()
+    return model
+
+# using the model function
+model = design_model(training_iterator)
+
+es = EarlyStopping(monitor='val_auc', mode= 'min', verbose=1, patience=20)
+
+print("\n Training model...")
+# fit the model with 10 ephochs and early stopping
+history = model.fit(
+    training_iterator,
+    steps_per_epoch=training_iterator.samples/BATCH_SIZE, epochs=5,
+    validation_data= validation_iterator, 
+    validation_steps= validation_iterator.samples/BATCH_SIZE,
+    callbacks=[es]
+)
+
+# plotting categorical and validation accuracy over epochs
+fig = plt.figure()
+ax1 = fig.add_subplot(2,2,1)
+ax1.plot(history.history['catagorical_acuracy'])
+ax1.plot(history.history['val_catagorical'])
+ax1.set_title('model accuracy')
+ax1.set_xlabel('epoch')
+ax1.set_ylabel('accuracy')
+ax1.legend(['train', 'validation'], loc='upper left')
+
+# plotting auc and validation auc over epochs
+ax2 = fig.add_subplot(2, 1, 2)
+ax2.plot(history.history['auc'])
+ax2.plot(history.history['val_auc'])
+ax2.set_title('model auc')
+ax2.set_xlabel('epoch')
+ax2.set_ylabel('auc')
+ax2.legend(['train', 'validation'], loc='upper left')
+
+plt.show()
+
+test_steps_per_epoch = numpy.math.ceil(validation_iterator.samples / validation_iterator.batch_size)
+predictions = model.predict(validation_iterator, steps=test_steps_per_epoch)
+test_steps_per_epoch = numpy.math.ceil(validation_iterator.samples / validation_iterator.batch_size)
+predicted_classes = numpy.argmax(predictions, axis=1)
+true_classes = validation_iterator.classes
+class_labels = list(validation_iterator.class_indices.keys())
+report = classification_report(true_classes, predicted_classes, target_names=class_labels)
+print(report)   
+
+cm=confusion_matrix(true_classes,predicted_classes)
+print(cm)
+
